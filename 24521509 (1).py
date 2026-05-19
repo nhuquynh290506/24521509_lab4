@@ -12,7 +12,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
 
-# Tải dữ liệu (Ví dụ với rượu vang đỏ - Wine Quality Red)
+# Tải dữ liệu
 url = "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv"
 data = pd.read_csv(url, sep=';')
 
@@ -25,13 +25,25 @@ y = data['quality'].values
 # Chia tập dữ liệu train/test
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+"""#Asignment 1:
+##Triển khai Cây quyết định (Decision Tree) bằng NumPy
+
+ Class Node : Thiết kế cấu trúc nút lưu giữ các thông tin: Thuộc tính chia (feature), ngưỡng chia (threshold), liên kết nhánh con (left, right) và nhãn dự đoán (value) nếu nút đó được xác định là nút lá.
+
+Gini Impurity: Sử dụng độ đo Gini để đánh giá mức độ hỗn loạn của nhãn tại một nút. Công thức cài đặt tối ưu bằng toán tử ma trận của NumPy:
+
+Tìm kiếm điểm chia tối ưu (_best_split): Duyệt qua danh sách các thuộc tính. Nhằm tối ưu hóa hiệu năng và tránh hiện tượng nghẽn thuật toán khi đối mặt với biến liên tục, tập hợp các thresholds được thu hẹp bằng cách lấy 20 điểm phân vị (Percentiles) phân phối thay vì lấy toàn bộ giá trị duy nhất (np.unique). Điểm chia được chọn là điểm tối đa hóa lượng thông tin thu được.
+
+Điều kiện dừng: Quá trình đệ quy dựng cây sẽ dừng lại và tạo nút lá khi rơi vào một trong các trường hợp: Đạt độ sâu tối đa (max_depth), số mẫu tại nút nhỏ hơn ngưỡng tối thiểu (min_samples_split), hoặc nút hoàn toàn tinh khiết (chỉ chứa 1 nhãn duy nhất). Nhãn của nút lá được quyết định bằng phương pháp bỏ phiếu đa số.
+"""
+
 class Node:
     def __init__(self, feature=None, threshold=None, left=None, right=None, *, value=None):
-        self.feature = feature       # Chỉ số của tính năng dùng để chia
-        self.threshold = threshold   # Ngưỡng giá trị để chia
-        self.left = left             # Nhánh con bên trái
-        self.right = right           # Nhánh con bên phải
-        self.value = value           # Giá trị dự đoán (nếu là nút lá)
+        self.feature = feature
+        self.threshold = threshold
+        self.left = left
+        self.right = right
+        self.value = value
 
     def is_leaf_node(self):
         return self.value is not None
@@ -76,13 +88,11 @@ class DecisionTreeNumPy:
                 left_idx, right_idx = self._split(X_column, thr)
                 if len(left_idx) == 0 or len(right_idx) == 0:
                     continue
-                # Tính Gini của các nhánh con
                 n = len(y)
                 n_l, n_r = len(left_idx), len(right_idx)
                 gini_l, gini_r = self._gini(y[left_idx]), self._gini(y[right_idx])
                 child_gini = (n_l / n) * gini_l + (n_r / n) * gini_r
 
-                # Information Gain (ở đây là mức độ giảm Gini)
                 gain = current_gini - child_gini
                 if gain > best_gain:
                     best_gain = gain
@@ -124,12 +134,20 @@ class DecisionTreeNumPy:
     def predict(self, X):
         return np.array([self._traverse_tree(x, self.root) for x in X])
 
-# --- Huấn luyện và Đánh giá ---
 dt_numpy = DecisionTreeNumPy(max_depth=7)
 dt_numpy.fit(X_train, y_train)
 dt_preds = dt_numpy.predict(X_test)
 
 print(f"Decision Tree (NumPy) F1 Score: {f1_score(y_test, dt_preds):.4f}")
+
+"""#Assignment 2:
+##Xây dụng Random Forest với Numpy
+Lấy mẫu Bootstrap (_bootstrap_samples): Với mỗi cây trong tổng số n_trees cây của rừng, thuật toán tiến hành rút mẫu ngẫu nhiên có hoàn lại (replace=True) từ tập dữ liệu gốc với kích thước mẫu bằng đúng kích thước ban đầu.
+
+(Feature Randomization): Để đảm bảo tính đa dạng và phá vỡ tính tương quan giữa các cây, tại mỗi node khi xây dựng cây con, thuật toán chỉ cho phép tìm kiếm điểm chia trên một tập con ngẫu nhiên gồm k thuộc tính thay vì duyệt qua toàn bộ không gian thuộc tính ban đầu.
+
+(Majority Voting): Khi có dữ liệu test, dữ liệu sẽ được đưa qua tất cả các cây để lấy ra một ma trận dự đoán có kích thước (n_trees, n_samples) Thuật toán sử dụng hàm np.swapaxes(tree_preds, 0, 1) để xoay trục dữ liệu về dạng (n_samples, n_trees). Kết quả dự đoán cuối cùng của Rừng cho mỗi mẫu dữ liệu là nhãn xuất hiện với tần suất cao nhất (bầu chọn số đông) từ các cây con.
+"""
 
 class RandomForestNumPy:
     def __init__(self, n_trees=10, max_depth=10, min_samples_split=2):
@@ -147,11 +165,9 @@ class RandomForestNumPy:
         self.trees = []
         n_features = X.shape[1]
 
-        # Công thức chuẩn của Random Forest: lấy căn bậc hai của tổng số thuộc tính tại mỗi node
         max_features = int(np.sqrt(n_features))
 
         for _ in range(self.n_trees):
-            # Tạo cây kèm theo tham số giới hạn số thuộc tính ngẫu nhiên (max_features)
             tree = DecisionTreeNumPy(
                 max_depth=self.max_depth,
                 min_samples_split=self.min_samples_split,
@@ -163,10 +179,10 @@ class RandomForestNumPy:
 
     def predict(self, X):
         # Thu thập dự đoán từ tất cả các cây trong rừng
-        tree_preds = np.array([tree.predict(X) for tree in self.trees]) # Shape: (n_trees, n_samples)
-        tree_preds = np.swapaxes(tree_preds, 0, 1)                      # Shape: (n_samples, n_trees)
+        tree_preds = np.array([tree.predict(X) for tree in self.trees])
+        tree_preds = np.swapaxes(tree_preds, 0, 1)
 
-        # Bầu chọn số đông (Majority voting) bằng hàm _most_common_label gián tiếp
+        # Bầu chọn số đông
         predictions = []
         for sample_pred in tree_preds:
             vals, counts = np.unique(sample_pred, return_counts=True)
@@ -174,24 +190,37 @@ class RandomForestNumPy:
 
         return np.array(predictions)
 
-# --- Huấn luyện và Đánh giá ---
 rf_numpy = RandomForestNumPy(n_trees=15, max_depth=7)
 rf_numpy.fit(X_train, y_train)
 rf_preds = rf_numpy.predict(X_test)
 
 print(f"Random Forest (NumPy) F1 Score: {f1_score(y_test, rf_preds):.4f}")
 
+"""#Assignment 3:
+##Cài bằng thư viện Scikit_Learn
+
+Nhập hai lớp mô hình trực tiếp từ thư viện: DecisionTreeClassifier và RandomForestClassifier. Cấu hình tham số kiểm soát độ sâu max_depth=7 đồng nhất cho cả mô hình thư viện và mô hình tự viết nhằm đảm bảo tính công bằng khi so sánh thực nghiệm. Đặt random_state=42 để đảm bảo kết quả có khả năng lặp lại một cách ổn định.
+"""
+
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
-# 1. Thư viện Decision Tree
+# Thư viện Decision Tree
 sk_dt = DecisionTreeClassifier(max_depth=7, random_state=42)
 sk_dt.fit(X_train, y_train)
 sk_dt_preds = sk_dt.predict(X_test)
 print(f"Scikit-Learn Decision Tree F1 Score: {f1_score(y_test, sk_dt_preds):.4f}")
 
-# 2. Thư viện Random Forest
+# Thư viện Random Forest
 sk_rf = RandomForestClassifier(n_estimators=15, max_depth=7, random_state=42)
 sk_rf.fit(X_train, y_train)
 sk_rf_preds = sk_rf.predict(X_test)
 print(f"Scikit-Learn Random Forest F1 Score: {f1_score(y_test, sk_rf_preds):.4f}")
+
+"""#Đánh giá kết quả:
+##Decision Tree và Scikit-Learn
+So sánh giữa Decision Tree (NumPy) và Scikit-Learn: Mô hình tự viết bằng NumPy đạt kết quả $F_1\text{-Score}$ rất tiệm cận so với thư viện Scikit-Learn.
+Sự chênh lệch nhỏ đến từ việc NumPy sử dụng kỹ thuật giới hạn 20 điểm phân vị (Percentiles) khi tìm kiếm threshold tối ưu cho biến liên tục, nhằm giảm chi phí tính toán và tăng tốc độ huấn luyện. Trong khi đó, Scikit-Learn duyệt qua toàn bộ các điểm chia khả thi trên tập dữ liệu.
+## Random Forest
+Ở cả hai phiên bản (NumPy và Scikit-Learn), mô hình Random Forest đều cho xu hướng cải thiện hiệu năng hoặc mang lại tính ổn định cao hơn so với Decision Tree
+"""
